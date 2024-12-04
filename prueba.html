@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buscar Centros de Reciclaje</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="manifest" href="manifest.json">
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDU7kix683wYF3h1fiEJYch-VOI96ZqItY&libraries=places"></script>
+    <style>
+        #map {
+            height: 80vh;
+            width: 100%;
+            display: none;
+            /* Ocultar el mapa inicialmente */
+        }
+        
+        #offlineResults {
+            display: none;
+            /* Ocultar la lista de resultados inicialmente */
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="container-hero">
+            <div class="container hero">
+                <div class="customer-support">
+                    <i class="fa-solid fa-phone-volume"></i>
+                    <div class="content-customer-support">
+                        <span class="text"> Soporte</span>
+                        <span class="number"> 238 131 3380 </span>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="container-navbar">
+            <nav class="navbar container">
+                <i class="fa-solid fa-bars"></i>
+                <ul class="menu">
+
+                    <li><a href="#">Inicio</a></li>
+                </ul>
+            </nav>
+
+
+
+        </div>
+    </header>
+
+    <BR></BR>
+    <div class="container mt-4">
+        <h1 class="text-center">Mapa de Centros de Reciclaje</h1>
+        <div class="input-group mb-3">
+            <input type="text" id="cityInput" class="form-control" placeholder="Ingrese la ciudad" aria-label="Ciudad">
+            <div class="input-group-append">
+                <button class="btn btn-primary" onclick="searchCity()">Buscar</button>
+            </div>
+        </div>
+        <div id="map"></div>
+        <div id="offlineResults" class="list-group mt-4"></div>
+    </div>
+
+    <script>
+        let map;
+        const dbName = "recyclingCentersDB";
+        const storeName = "centrosReciclaje";
+        let db;
+
+        // Abre la base de datos IndexedDB
+        function openDb() {
+            const request = indexedDB.open(dbName, 1);
+
+            request.onupgradeneeded = (event) => {
+                db = event.target.result;
+                if (!db.objectStoreNames.contains(storeName)) {
+                    db.createObjectStore(storeName, {
+                        keyPath: "id"
+                    });
+                }
+            };
+
+            request.onsuccess = (event) => {
+                db = event.target.result;
+            };
+
+            request.onerror = (event) => {
+                console.error("Error al abrir IndexedDB", event);
+            };
+        }
+
+        // Guarda los resultados en IndexedDB
+        function saveResultsToDb(results) {
+            const transaction = db.transaction(storeName, "readwrite");
+            const store = transaction.objectStore(storeName);
+
+            // Eliminar los resultados anteriores antes de almacenar los nuevos
+            store.clear();
+
+            results.forEach(result => {
+                store.put({
+                    id: result.place_id,
+                    name: result.name,
+                    vicinity: result.vicinity,
+                    location: {
+                        lat: result.geometry.location.lat(),
+                        lng: result.geometry.location.lng()
+                    }
+                });
+            })
+
+            transaction.oncomplete = () => {
+                console.log("Resultados guardados en IndexedDB");
+            };
+
+            transaction.onerror = (event) => {
+                console.error("Error al guardar en IndexedDB", event);
+            };
+        }
+
+        // Cargar resultados desde IndexedDB
+        function loadResultsFromDb() {
+            const transaction = db.transaction(storeName, "readonly");
+            const store = transaction.objectStore(storeName);
+            const request = store.getAll();
+
+            request.onsuccess = (event) => {
+                const results = event.target.result;
+                if (results.length > 0) {
+                    displayOfflineResults(results);
+                } else {
+                    console.log("No hay resultados almacenados.");
+                }
+            };
+
+            request.onerror = (event) => {
+                console.error("Error al cargar resultados de IndexedDB", event);
+            };
+        }
+
+        // Muestra los resultados almacenados en la lista
+        function displayOfflineResults(results) {
+            const offlineResultsContainer = document.getElementById("offlineResults");
+            offlineResultsContainer.innerHTML = ""; // Limpiar los resultados previos
+            offlineResultsContainer.style.display = "block";
+
+            results.forEach(result => {
+                const listItem = document.createElement("div");
+                listItem.classList.add("list-group-item");
+                listItem.innerHTML = `
+                    <h5>${result.name || "Centro de reciclaje"}</h5>
+                    <p><strong>Dirección:</strong> ${result.vicinity || 'No disponible'}</p>
+                `;
+                offlineResultsContainer.appendChild(listItem);
+            });
+        }
+
+        // Inicialización del mapa y apertura de la base de datos
+        function initMap() {
+            openDb(); // Abrir IndexedDB al cargar la página
+
+            if (navigator.onLine) {
+                document.getElementById("map").style.display = "block";
+                document.getElementById("offlineResults").style.display = "none";
+                map = new google.maps.Map(document.getElementById("map"), {
+                    center: {
+                        lat: 19.0413,
+                        lng: -98.2062
+                    },
+                    zoom: 12,
+                });
+            } else {
+                loadResultsFromDb();
+
+                function loadResultsFromDb() {
+                    const transaction = db.transaction(storeName, "readonly");
+                    const store = transaction.objectStore(storeName);
+                    const request = store.getAll();
+
+                    request.onsuccess = (event) => {
+                        const results = event.target.result;
+                        if (results.length > 0) {
+                            displayOfflineResults(results);
+
+                            // Crear un mapa con marcadores estáticos
+                            const offlineMap = new google.maps.Map(document.getElementById("map"), {
+                                center: {
+                                    lat: results[0].location.lat,
+                                    lng: results[0].location.lng
+                                },
+                                zoom: 12
+                            });
+                            results.forEach(result => {
+                                new google.maps.Marker({
+                                    position: result.location,
+                                    map: offlineMap,
+                                    title: result.name
+                                });
+                            });
+                        } else {
+                            console.log("No hay resultados almacenados.");
+                        }
+                    };
+
+                    request.onerror = (event) => {
+                        console.error("Error al cargar resultados de IndexedDB", event);
+                    };
+                }
+                // Cargar resultados almacenados cuando no haya conexión
+            }
+        }
+
+        // Función de búsqueda de ciudad
+        function searchCity() {
+            const city = document.getElementById("cityInput").value;
+
+            if (!navigator.onLine) {
+                alert("Estás sin conexión. Mostrando los últimos resultados almacenados.");
+                loadResultsFromDb(); // Mostrar resultados de IndexedDB cuando no hay conexión
+                return;
+            }
+
+            if (city) {
+                const geocoder = new google.maps.Geocoder();
+                geocoder.geocode({
+                    address: city
+                }, (results, status) => {
+                    if (status === "OK") {
+                        map.setCenter(results[0].geometry.location);
+                        findRecyclingCenters(map);
+                    } else {
+                        alert("No se pudo encontrar la ubicación: " + status);
+                    }
+                });
+            } else {
+                alert("Por favor, ingrese una ciudad.");
+            }
+        }
+
+        // Búsqueda de centros de reciclaje en línea
+        function findRecyclingCenters(map) {
+            const service = new google.maps.places.PlacesService(map);
+            const request = {
+                location: map.getCenter(),
+                radius: 15000,
+                keyword: "centro de reciclaje",
+            };
+
+            service.nearbySearch(request, (results, status) => {
+                if (status === google.maps.places.PlacesServiceStatus.OK) {
+                    results.forEach(result => createMarker(result, map));
+                    saveResultsToDb(results); // Guardar resultados en IndexedDB
+                } else {
+                    console.error("No se encontraron centros de reciclaje:", status);
+                }
+            });
+        }
+
+        // Creación de marcador para cada centro de reciclaje
+        function createMarker(place, map) {
+            const marker = new google.maps.Marker({
+                map,
+                position: place.geometry.location,
+                title: place.name,
+            });
+
+            const infowindow = new google.maps.InfoWindow();
+            marker.addListener("click", () => {
+                const content = `
+                    <div>
+                        <h5>${place.name || "Centro de reciclaje"}</h5>
+                        <p><strong>Dirección:</strong> ${place.vicinity || 'No disponible'}</p>
+                    </div>
+                `;
+                infowindow.setContent(content);
+                infowindow.open(map, marker);
+            });
+        }
+
+        window.onload = initMap;
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/service-worker.js')
+                .then(() => console.log("Service Worker registrado"))
+                .catch(err => console.error("Error al registrar el Service Worker", err));
+        }
+    </script>
+
+</body>
+
+</html>
