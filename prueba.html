@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<<<<<<< HEAD
     <title>Buscar Centros de Reciclaje</title>
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
@@ -56,18 +57,33 @@
     <BR></BR>
     <div class="container mt-4">
         <h1 class="text-center">Mapa de Centros de Reciclaje</h1>
+=======
+    <title>Buscar Restaurantes y Comentarios</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDU7kix683wYF3h1fiEJYch-VOI96ZqItY&libraries=places"></script>
+</head>
+
+<body>
+    <div class="container mt-4">
+        <h1 class="text-center">Lista de Restaurantes y Comentarios</h1>
+>>>>>>> bbfc47df41775bf7ac345eead3d938e02a52223b
         <div class="input-group mb-3">
             <input type="text" id="cityInput" class="form-control" placeholder="Ingrese la ciudad" aria-label="Ciudad">
             <div class="input-group-append">
                 <button class="btn btn-primary" onclick="searchCity()">Buscar</button>
             </div>
         </div>
+<<<<<<< HEAD
         <div id="map"></div>
         <div id="offlineResults" class="list-group mt-4"></div>
+=======
+        <div id="offlineResults" class="mt-4"></div>
+>>>>>>> bbfc47df41775bf7ac345eead3d938e02a52223b
     </div>
 
     <script>
         let map;
+<<<<<<< HEAD
         const dbName = "recyclingCentersDB";
         const storeName = "centrosReciclaje";
         let db;
@@ -225,6 +241,25 @@
                 return;
             }
 
+=======
+
+        function initMap() {
+            map = new google.maps.Map(document.createElement("div"), {
+                center: {
+                    lat: 0,
+                    lng: 0
+                },
+                zoom: 12,
+            });
+
+            if (!navigator.onLine) {
+                loadStoredResults();
+            }
+        }
+
+        function searchCity() {
+            const city = document.getElementById("cityInput").value;
+>>>>>>> bbfc47df41775bf7ac345eead3d938e02a52223b
             if (city) {
                 const geocoder = new google.maps.Geocoder();
                 geocoder.geocode({
@@ -232,7 +267,11 @@
                 }, (results, status) => {
                     if (status === "OK") {
                         map.setCenter(results[0].geometry.location);
+<<<<<<< HEAD
                         findRecyclingCenters(map);
+=======
+                        findRestaurants(map);
+>>>>>>> bbfc47df41775bf7ac345eead3d938e02a52223b
                     } else {
                         alert("No se pudo encontrar la ubicación: " + status);
                     }
@@ -242,25 +281,41 @@
             }
         }
 
+<<<<<<< HEAD
         // Búsqueda de centros de reciclaje en línea
         function findRecyclingCenters(map) {
+=======
+        function findRestaurants(map) {
+>>>>>>> bbfc47df41775bf7ac345eead3d938e02a52223b
             const service = new google.maps.places.PlacesService(map);
             const request = {
                 location: map.getCenter(),
                 radius: 15000,
+<<<<<<< HEAD
                 keyword: "centro de reciclaje",
+=======
+                type: 'restaurant',
+>>>>>>> bbfc47df41775bf7ac345eead3d938e02a52223b
             };
 
             service.nearbySearch(request, (results, status) => {
                 if (status === google.maps.places.PlacesServiceStatus.OK) {
+<<<<<<< HEAD
                     results.forEach(result => createMarker(result, map));
                     saveResultsToDb(results); // Guardar resultados en IndexedDB
                 } else {
                     console.error("No se encontraron centros de reciclaje:", status);
+=======
+                    localStorage.setItem("lastResults", JSON.stringify(results.map(r => r.place_id)));
+                    displayResults(results);
+                } else {
+                    console.error("No se encontraron restaurantes:", status);
+>>>>>>> bbfc47df41775bf7ac345eead3d938e02a52223b
                 }
             });
         }
 
+<<<<<<< HEAD
         // Creación de marcador para cada centro de reciclaje
         function createMarker(place, map) {
             const marker = new google.maps.Marker({
@@ -291,6 +346,75 @@
         }
     </script>
 
+=======
+        function displayResults(results) {
+            const offlineResultsContainer = document.getElementById("offlineResults");
+            offlineResultsContainer.innerHTML = "";
+
+            const restaurantDetails = [];
+
+            results.forEach(result => {
+                const placeId = result.place_id;
+                getRestaurantDetails(placeId, restaurantDetails);
+            });
+
+            // Guarda todos los detalles en localStorage después de obtenerlos
+            localStorage.setItem("restaurantDetails", JSON.stringify(restaurantDetails));
+            console.log("Detalles de los restaurantes guardados en localStorage:", restaurantDetails);
+        }
+
+
+        function getRestaurantDetails(placeId, restaurantDetails) {
+            const service = new google.maps.places.PlacesService(map);
+            service.getDetails({
+                        placeId: placeId
+                    }, (place, status) => {
+                        if (status === google.maps.places.PlacesServiceStatus.OK) {
+                            restaurantDetails.push({
+                                name: place.name,
+                                address: place.vicinity || 'No disponible',
+                                reviews: place.reviews ? place.reviews.map(review => ({
+                                    author: review.author_name,
+                                    text: review.text
+                                })) : []
+                            });
+
+                            const card = document.createElement("div");
+                            card.classList.add("card", "mb-3");
+                            card.innerHTML = `
+                <div class="card-body">
+                    <h5 class="card-title">${place.name}</h5>
+                    <p class="card-text"><strong>Dirección:</strong> ${place.vicinity || 'No disponible'}</p>
+                    ${place.reviews ? 
+                        `<h6>Comentarios:</h6>
+                        <ul class="list-unstyled">
+                            ${place.reviews.map(review => `<li class="mb-2"><strong>${review.author_name}:</strong> ${review.text}</li>`).join('')}
+                        </ul>` : 
+                        `<p>No hay comentarios disponibles</p>`
+                    }
+                </div>
+            `;
+            document.getElementById("offlineResults").appendChild(card);
+        } else {
+            console.error("Detalles no disponibles para el lugar:", status);
+        }
+    });
+}
+        function loadStoredResults() {
+            const storedPlaceIds = JSON.parse(localStorage.getItem("lastResults"));
+            const offlineResultsContainer = document.getElementById("offlineResults");
+            offlineResultsContainer.innerHTML = "";
+
+            if (storedPlaceIds) {
+                storedPlaceIds.forEach(placeId => getRestaurantDetails(placeId));
+            } else {
+                offlineResultsContainer.innerHTML = "<p>No hay resultados guardados disponibles para mostrar sin conexión.</p>";
+            }
+        }
+
+        window.onload = initMap;
+    </script>
+>>>>>>> bbfc47df41775bf7ac345eead3d938e02a52223b
 </body>
 
 </html>
